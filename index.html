@@ -327,6 +327,7 @@
             let redoStack = [];
             let previewSlideIndex = 0;
             let previewStepIndex = 0; // Animation step within a slide
+            let lastSelectedTextElementProperties = null;
 
             // --- Helper Functions ---
             const getDefaultPresentation = () => ({
@@ -612,7 +613,7 @@
             }
             
             // --- Actions ---
-            function addElement(type, content = '') {
+function addElement(type, content = '') {
                 const currentSlide = getCurrentSlide();
                 if (!currentSlide) return;
                 saveState();
@@ -626,12 +627,11 @@
                 };
 
                 if (type === 'text') {
-                    const lastSelectedElement = getSelectedElement();
                     newElement.content = '新しいテキスト';
-                    if (lastSelectedElement && lastSelectedElement.type === 'text') {
-                        newElement.textColor = lastSelectedElement.textColor;
-                        newElement.fontFamily = lastSelectedElement.fontFamily;
-                        newElement.fontSize = lastSelectedElement.fontSize;
+                    if (lastSelectedTextElementProperties) {
+                        newElement.textColor = lastSelectedTextElementProperties.textColor;
+                        newElement.fontFamily = lastSelectedTextElementProperties.fontFamily;
+                        newElement.fontSize = lastSelectedTextElementProperties.fontSize;
                     } else {
                         newElement.textColor = '#000000';
                         newElement.fontFamily = "'Inter', sans-serif";
@@ -658,6 +658,14 @@
             function selectElement(id) {
                 if (selectedElementId === id) return;
                 selectedElementId = id;
+                const selectedEl = getSelectedElement();
+                if (selectedEl && selectedEl.type === 'text') {
+                    lastSelectedTextElementProperties = {
+                        textColor: selectedEl.textColor,
+                        fontFamily: selectedEl.fontFamily,
+                        fontSize: selectedEl.fontSize,
+                    };
+                }
                 renderAll();
             }
 
