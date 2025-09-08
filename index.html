@@ -626,10 +626,17 @@
                 };
 
                 if (type === 'text') {
+                    const lastSelectedElement = getSelectedElement();
                     newElement.content = '新しいテキスト';
-                    newElement.textColor = '#000000'; // Default to light text color for dark mode
-                    newElement.fontFamily = "'Inter', sans-serif";
-                    newElement.fontSize = 5;
+                    if (lastSelectedElement && lastSelectedElement.type === 'text') {
+                        newElement.textColor = lastSelectedElement.textColor;
+                        newElement.fontFamily = lastSelectedElement.fontFamily;
+                        newElement.fontSize = lastSelectedElement.fontSize;
+                    } else {
+                        newElement.textColor = '#000000';
+                        newElement.fontFamily = "'Inter', sans-serif";
+                        newElement.fontSize = 5;
+                    }
                 } else if (type === 'image') {
                     newElement.content = content;
                     newElement.h = 30;
@@ -638,6 +645,7 @@
                 currentSlide.elements.push(newElement);
                 selectElement(newElement.id);
             }
+
 
             function deleteSelectedElement() {
                 const currentSlide = getCurrentSlide();
@@ -675,7 +683,9 @@
 
             function addSlide() {
                 saveState();
-                const newSlide = { id: nextSlideId++, elements: [], backgroundColor: '#ffffff' };
+                const currentSlide = getCurrentSlide();
+                const newBackgroundColor = currentSlide ? currentSlide.backgroundColor : '#ffffff';
+                const newSlide = { id: nextSlideId++, elements: [], backgroundColor: newBackgroundColor };
                 presentation.slides.push(newSlide);
                 selectSlide(newSlide.id);
             }
@@ -685,6 +695,7 @@
                     alert('最後のスライドは削除できません。');
                     return;
                 }
+
                 saveState();
                 presentation.slides = presentation.slides.filter(s => s.id !== slideId);
                 if (presentation.currentSlideId === slideId) {
