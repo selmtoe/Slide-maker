@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>プレゼンテーションアプリ</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- KaTeX for LaTeX rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMeaPoAbJFdSfBocSLweQSabRjFxFbDYwPrJQioVdELjH/rML" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" xintegrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+    <!-- Custom Styles -->
+    <style>
+        body {
+            font-family: 'Inter', 'Helvetica Neue', 'Arial', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, sans-serif;
+            touch-action: none; /* Disable browser default touch actions like pinch-zoom */
+        }
+        /* 16:9 aspect ratio for the slide */
+        .slide {
+            position: relative;
+            width: 100%;
+            padding-top: 56.25%; /* 9 / 16 = 0.5625 */
+            background-color: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            overflow: hidden;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .slide-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        .slide-element {
+            position: absolute;
+            box-sizing: border-box;
+            cursor: move;
+            user-select: none;
+            padding: 8px;
+            border: 2px solid transparent;
+            transition: border-color 0.2s;
+            overflow-wrap: break-word;
+            line-height: 1.2;
+        }
+        .slide-element.selected {
+            border: 2px solid #3b82f6; /* blue-500 */
+            z-index: 1000 !important;
+        }
+        .slide-element img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Or 'cover', 'fill', etc. */
+            pointer-events: none; /* Prevent image from capturing pointer events */
+        }
+        .resize-handle {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background-color: #3b82f6;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: nwse-resize;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+            display: none;
+        }
+        .slide-element.selected .resize-handle {
+            display: block;
+        }
+        .katex-display { margin: 0; }
+        .thumbnail {
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .thumbnail.active {
+            border-color: #3b82f6;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 h-screen overflow-hidden flex flex-col">
+
+    <!-- Header / Toolbar -->
+    <header class="bg-white shadow-md p-2 flex items-center space-x-4 z-20 flex-shrink-0">
+        <h1 class="text-lg font-bold text-gray-700">プレゼンテーション</h1>
+        <button id="add-textbox" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
+            テキスト追加
+        </button>
+        <button id="add-image" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
+            画像追加
+        </button>
+        <input type="file" id="image-input" accept="image/*" class="hidden">
+        <div class="flex items-center space-x-2">
+            <label for="slide-bg-color" class="text-sm font-medium text-gray-600">スライド背景色:</label>
+            <input type="color" id="slide-bg-color" value="#ffffff" class="w-10 h-8 p-1 border rounded-md cursor-pointer">
+        </div>
+        <!-- New Controls: Undo, Redo, Preview -->
+        <div class="flex items-center space-x-2 ml-auto">
+            <button id="undo-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed">
+                元に戻す
+            </button>
+            <button id="redo-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed">
+                やり直し
+            </button>
+            <button id="preview-btn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
+                プレビュー
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow flex p-4 gap-4 overflow-hidden">
+        <!-- Thumbnail Panel -->
+        <aside class="w-48 bg-white p-3 rounded-lg shadow-lg flex flex-col flex-shrink-0">
+            <h2 class="text-md font-bold mb-3 text-center text-gray-700">スライド一覧</h2>
+            <div id="thumbnail-list" class="flex-grow space-y-3 overflow-y-auto">
+                <!-- Thumbnails will be rendered here -->
+            </div>
+            <button id="add-slide" class="mt-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow w-full">
+                スライドを追加
+            </button>
+        </aside>
+
+        <!-- Slide Editor -->
+        <div class="flex-grow flex items-center justify-center">
+            <div id="slide-container" class="w-full max-w-5xl">
+                <div id="slide-background" class="slide">
+                    <div id="slide-content" class="slide-content">
+                        <!-- Elements will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Properties Panel -->
+        <aside id="properties-panel" class="w-80 bg-white p-4 rounded-lg shadow-lg overflow-y-auto flex-shrink-0">
+            <div id="panel-placeholder" class="text-center text-gray-500">
+                <p>要素を選択して編集します</p>
+            </div>
+            <div id="panel-content" class="hidden space-y-4">
+                <div>
+                    <h3 class="font-bold mb-2">トランスフォーム</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label for="prop-x" class="text-sm font-medium text-gray-600 block">X (px)</label>
+                            <input type="number" id="prop-x" class="w-full p-1 border rounded-md">
+                        </div>
+                        <div>
+                            <label for="prop-y" class="text-sm font-medium text-gray-600 block">Y (px)</label>
+                            <input type="number" id="prop-y" class="w-full p-1 border rounded-md">
+                        </div>
+                        <div>
+                            <label for="prop-w" class="text-sm font-medium text-gray-600 block">幅 (px)</label>
+                            <input type="number" id="prop-w" class="w-full p-1 border rounded-md">
+                        </div>
+                        <div>
+                            <label for="prop-h" class="text-sm font-medium text-gray-600 block">高さ (px)</label>
+                            <input type="number" id="prop-h" class="w-full p-1 border rounded-md">
+                        </div>
+                    </div>
+                </div>
+                <div id="text-properties" class="space-y-2">
+                    <h3 class="font-bold">テキストスタイル</h3>
+                    <div>
+                        <label for="prop-textColor" class="text-sm font-medium text-gray-600 block">文字色</label>
+                        <input type="color" id="prop-textColor" class="w-full h-8 p-0 border rounded-md">
+                    </div>
+                     <div>
+                        <label for="prop-fontSize" class="text-sm font-medium text-gray-600 block">フォントサイズ (% of slide height)</label>
+                        <input type="number" id="prop-fontSize" min="1" class="w-full p-1 border rounded-md">
+                    </div>
+                    <div>
+                        <label for="prop-fontFamily" class="text-sm font-medium text-gray-600 block">フォント</label>
+                        <select id="prop-fontFamily" class="w-full p-1 border rounded-md">
+                            <option value="'Inter', sans-serif">Inter (サンセリフ)</option>
+                            <option value="'Times New Roman', serif">Times New Roman (セリフ)</option>
+                            <option value="'Courier New', monospace">Courier New (等幅)</option>
+                            <option value="'Hiragino Kaku Gothic ProN', 'ヒラギノ角ゴ ProN W3', sans-serif">ヒラギノ角ゴ ProN</option>
+                            <option value="Meiryo, 'メイリオ', sans-serif">メイリオ</option>
+                            <option value="'BIZ UDPGothic', sans-serif">BIZ UDPゴシック</option>
+                        </select>
+                    </div>
+                     <div>
+                        <label for="prop-content" class="text-sm font-bold text-gray-600 block mb-1">テキスト内容</label>
+                        <textarea id="prop-content" rows="6" class="w-full p-2 border rounded-md font-mono text-sm" placeholder="テキストを入力...&#10;LaTeX記法が使えます: $E=mc^2$"></textarea>
+                    </div>
+                </div>
+                <!-- Animation Properties -->
+                <div id="animation-properties" class="space-y-2 border-t pt-4">
+                    <h3 class="font-bold">アニメーション</h3>
+                    <div>
+                        <label for="prop-animationType" class="text-sm font-medium text-gray-600 block">登場エフェクト</label>
+                        <select id="prop-animationType" class="w-full p-1 border rounded-md">
+                            <option value="instant">瞬時に登場</option>
+                            <option value="fade">ぼやけながら登場</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="prop-animationOrder" class="text-sm font-medium text-gray-600 block">表示順序</label>
+                        <input type="number" id="prop-animationOrder" min="0" class="w-full p-1 border rounded-md" placeholder="0はページ表示時">
+                    </div>
+                </div>
+                 <div class="border-t pt-4">
+                    <label for="prop-z" class="text-sm font-medium text-gray-600 block">レイヤー (重ね順)</label>
+                    <input type="number" id="prop-z" min="1" class="w-full p-1 border rounded-md">
+                </div>
+                 <div class="flex justify-between items-center pt-4">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="prop-lock" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                        <label for="prop-lock" class="ml-2 block text-sm text-gray-900">ロック</label>
+                    </div>
+                    <button id="delete-element" class="bg-red-500 hover:bg-red-600 text-white text-sm font-bold py-1 px-3 rounded-md transition-colors">
+                        要素を削除
+                    </button>
+                </div>
+            </div>
+        </aside>
+    </main>
+    
+    <!-- Preview Overlay -->
+    <div id="preview-overlay" class="hidden fixed inset-0 bg-gray-900 bg-opacity-95 z-50 flex flex-col items-center justify-center p-4 transition-opacity duration-300">
+        <div class="w-full h-full max-w-7xl max-h-full flex items-center justify-center relative">
+             <div id="preview-slide-host" class="w-full aspect-video bg-white relative shadow-2xl rounded-lg overflow-hidden">
+                <!-- Preview slide content is rendered here -->
+             </div>
+             <!-- Navigation Tap Areas -->
+             <div id="preview-nav-left" class="absolute left-0 top-0 h-full w-1/2 cursor-pointer z-10"></div>
+             <div id="preview-nav-right" class="absolute right-0 top-0 h-full w-1/2 cursor-pointer z-10"></div>
+        </div>
+        <button id="exit-preview-btn" class="absolute top-4 right-4 text-white hover:text-gray-300 text-5xl font-light transition z-20">&times;</button>
+        <div id="preview-page-number" class="absolute bottom-4 text-white text-lg font-semibold"></div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const slideContainer = document.getElementById('slide-content');
+            const slideBackground = document.getElementById('slide-background');
+            const slideBgColorInput = document.getElementById('slide-bg-color');
+            const thumbnailList = document.getElementById('thumbnail-list');
+            const addSlideBtn = document.getElementById('add-slide');
+            const addTextboxBtn = document.getElementById('add-textbox');
+            const addImageBtn = document.getElementById('add-image');
+            const imageInput = document.getElementById('image-input');
+            const deleteElementBtn = document.getElementById('delete-element');
+            const undoBtn = document.getElementById('undo-btn');
+            const redoBtn = document.getElementById('redo-btn');
+            const previewBtn = document.getElementById('preview-btn');
+            const previewOverlay = document.getElementById('preview-overlay');
+            const exitPreviewBtn = document.getElementById('exit-preview-btn');
+            const previewSlideHost = document.getElementById('preview-slide-host');
+            const previewPageNumber = document.getElementById('preview-page-number');
+            const previewNavLeft = document.getElementById('preview-nav-left');
+            const previewNavRight = document.getElementById('preview-nav-right');
+            
+            const propertiesPanel = document.getElementById('properties-panel');
+            const panelPlaceholder = document.getElementById('panel-placeholder');
+            const panelContent = document.getElementById('panel-content');
+            const textProperties = document.getElementById('text-properties');
+
+            const propInputs = {
+                x: document.getElementById('prop-x'),
+                y: document.getElementById('prop-y'),
+                w: document.getElementById('prop-w'),
+                h: document.getElementById('prop-h'),
+                z: document.getElementById('prop-z'),
+                content: document.getElementById('prop-content'),
+                lock: document.getElementById('prop-lock'),
+                textColor: document.getElementById('prop-textColor'),
+                fontSize: document.getElementById('prop-fontSize'),
+                fontFamily: document.getElementById('prop-fontFamily'),
+                animationType: document.getElementById('prop-animationType'),
+                animationOrder: document.getElementById('prop-animationOrder'),
+            };
+
+            // --- App State ---
+            let presentation = {
+                slides: [{
+                    id: 0,
+                    elements: [],
+                    backgroundColor: '#ffffff'
+                }],
+                currentSlideId: 0,
+            };
+            let selectedElementId = null;
+            let nextElementId = 1;
+            let nextSlideId = 1;
+            let activeOperation = null;
+            let undoStack = [];
+            let redoStack = [];
+            let previewSlideIndex = 0;
+            let previewStepIndex = 0; // Animation step within a slide
+
+            // --- Helper Functions ---
+            const getCurrentSlide = () => presentation.slides.find(s => s.id === presentation.currentSlideId);
+            const getSelectedElement = () => getCurrentSlide()?.elements.find(el => el.id === selectedElementId);
+            const cloneState = (state) => JSON.parse(JSON.stringify(state));
+
+            // --- History (Undo/Redo) Functions ---
+            function saveState() {
+                redoStack = [];
+                undoStack.push(cloneState(presentation));
+                if (undoStack.length > 50) {
+                    undoStack.shift();
+                }
+                updateUndoRedoButtons();
+            }
+
+            function undo() {
+                if (undoStack.length === 0) return;
+                redoStack.push(cloneState(presentation));
+                presentation = undoStack.pop();
+                deselectAll();
+                updateUndoRedoButtons();
+            }
+
+            function redo() {
+                if (redoStack.length === 0) return;
+                undoStack.push(cloneState(presentation));
+                presentation = redoStack.pop();
+                deselectAll();
+                updateUndoRedoButtons();
+            }
+            
+            function updateUndoRedoButtons() {
+                undoBtn.disabled = undoStack.length === 0;
+                redoBtn.disabled = redoStack.length === 0;
+            }
+
+            // --- Core Functions ---
+            function renderAll() {
+                renderThumbnails();
+                renderSlide();
+                updatePropertiesPanel();
+            }
+
+            function renderThumbnails() {
+                thumbnailList.innerHTML = '';
+                presentation.slides.forEach((slide, index) => {
+                    const thumbWrapper = document.createElement('div');
+                    thumbWrapper.className = 'relative group';
+
+                    const pageNumber = document.createElement('span');
+                    pageNumber.className = 'absolute top-1 left-1 text-xs bg-gray-700 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold z-10';
+                    pageNumber.textContent = index + 1;
+                    
+                    const thumbDiv = document.createElement('div');
+                    thumbDiv.className = `thumbnail aspect-video bg-white rounded-md shadow-md ${slide.id === presentation.currentSlideId ? 'active' : ''}`;
+                    thumbDiv.style.backgroundColor = slide.backgroundColor;
+                    thumbDiv.dataset.slideId = slide.id;
+                    
+                    thumbDiv.addEventListener('click', () => selectSlide(slide.id));
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.innerHTML = '&times;';
+                    deleteBtn.className = 'absolute top-0 right-0 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10';
+                    deleteBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        deleteSlide(slide.id);
+                    };
+
+                    thumbWrapper.append(pageNumber, thumbDiv, deleteBtn);
+                    thumbnailList.appendChild(thumbWrapper);
+                });
+            }
+
+            function renderSlide() {
+                const currentSlide = getCurrentSlide();
+                if (!currentSlide) {
+                    slideContainer.innerHTML = '<p class="text-center text-gray-500">スライドがありません。追加してください。</p>';
+                    slideBackground.style.backgroundColor = '#f3f4f6';
+                    return;
+                }
+
+                slideContainer.innerHTML = '';
+                slideBackground.style.backgroundColor = currentSlide.backgroundColor;
+                slideBgColorInput.value = currentSlide.backgroundColor;
+
+                currentSlide.elements.sort((a, b) => a.z - b.z);
+
+                currentSlide.elements.forEach(el => {
+                    const elDiv = document.createElement('div');
+                    elDiv.id = `el-${el.id}`;
+                    elDiv.className = 'slide-element';
+                    if (el.id === selectedElementId) elDiv.classList.add('selected');
+                    
+                    const slideRect = slideContainer.getBoundingClientRect();
+                    elDiv.style.left = `${(el.x / 100) * slideRect.width}px`;
+                    elDiv.style.top = `${(el.y / 100) * slideRect.height}px`;
+                    elDiv.style.width = `${(el.w / 100) * slideRect.width}px`;
+                    elDiv.style.height = `${(el.h / 100) * slideRect.height}px`;
+                    elDiv.style.zIndex = el.z;
+                    if (el.lock) elDiv.style.cursor = 'default';
+
+                    if (el.type === 'text') {
+                        elDiv.style.color = el.textColor;
+                        elDiv.style.fontFamily = el.fontFamily;
+                        elDiv.style.fontSize = `${(el.fontSize / 100) * slideRect.height}px`;
+                        elDiv.innerHTML = el.content.replace(/\n/g, '<br>');
+                         try {
+                           window.renderMathInElement(elDiv, {
+                               delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
+                               throwOnError: false
+                           });
+                        } catch (error) { console.error("KaTeX rendering error:", error); }
+                    } else if (el.type === 'image') {
+                        const img = document.createElement('img');
+                        img.src = el.content;
+                        elDiv.appendChild(img);
+                    }
+                    
+                    const resizeHandle = document.createElement('div');
+                    resizeHandle.className = 'resize-handle';
+                    resizeHandle.style.top = '-8px';
+                    resizeHandle.style.left = '-8px';
+                    elDiv.appendChild(resizeHandle);
+                    
+                    elDiv.addEventListener('pointerdown', (e) => {
+                        e.stopPropagation();
+                        selectElement(el.id);
+                        if (el.lock) return;
+
+                        const isResizeHandle = e.target === resizeHandle;
+                        const pointer = e.touches ? e.touches[0] : e;
+                        
+                        activeOperation = {
+                            elementId: el.id,
+                            type: isResizeHandle ? 'resize' : 'move',
+                            startX: el.x, startY: el.y, startW: el.w, startH: el.h,
+                            startClientX: pointer.clientX, startClientY: pointer.clientY,
+                        };
+                        document.addEventListener('pointermove', onPointerMove);
+                        document.addEventListener('pointerup', onPointerUp);
+                    });
+
+                    slideContainer.appendChild(elDiv);
+                });
+            }
+
+            function updatePropertiesPanel() {
+                const selectedEl = getSelectedElement();
+                if (selectedEl) {
+                    panelPlaceholder.classList.add('hidden');
+                    panelContent.classList.remove('hidden');
+
+                    const slideRect = slideContainer.getBoundingClientRect();
+                    propInputs.x.value = Math.round((selectedEl.x / 100) * slideRect.width);
+                    propInputs.y.value = Math.round((selectedEl.y / 100) * slideRect.height);
+                    propInputs.w.value = Math.round((selectedEl.w / 100) * slideRect.width);
+                    propInputs.h.value = Math.round((selectedEl.h / 100) * slideRect.height);
+                    propInputs.z.value = selectedEl.z;
+                    propInputs.lock.checked = selectedEl.lock;
+                    propInputs.animationType.value = selectedEl.animationType || 'instant';
+                    propInputs.animationOrder.value = selectedEl.animationOrder === undefined ? 0 : selectedEl.animationOrder;
+
+
+                    if (selectedEl.type === 'text') {
+                        textProperties.classList.remove('hidden');
+                        propInputs.content.value = selectedEl.content;
+                        propInputs.textColor.value = selectedEl.textColor;
+                        propInputs.fontSize.value = selectedEl.fontSize;
+                        propInputs.fontFamily.value = selectedEl.fontFamily;
+                    } else {
+                        textProperties.classList.add('hidden');
+                    }
+                } else {
+                    panelPlaceholder.classList.remove('hidden');
+                    panelContent.classList.add('hidden');
+                }
+            }
+            
+            // --- Actions ---
+            function addElement(type, content = '') {
+                saveState();
+                const currentSlide = getCurrentSlide();
+                if (!currentSlide) return;
+
+                const maxZ = Math.max(0, ...currentSlide.elements.map(e => e.z || 0));
+                const newElement = {
+                    id: nextElementId++, type,
+                    x: 10, y: 10, w: 30, h: 15, z: maxZ + 1, lock: false,
+                    animationType: 'instant',
+                    animationOrder: 0,
+                };
+
+                if (type === 'text') {
+                    newElement.content = '新しいテキスト';
+                    newElement.textColor = '#000000';
+                    newElement.fontFamily = "'Inter', sans-serif";
+                    newElement.fontSize = 5;
+                } else if (type === 'image') {
+                    newElement.content = content;
+                    newElement.h = 30;
+                }
+
+                currentSlide.elements.push(newElement);
+                selectElement(newElement.id);
+            }
+
+            function deleteSelectedElement() {
+                saveState();
+                const currentSlide = getCurrentSlide();
+                if (!currentSlide || selectedElementId === null) return;
+                currentSlide.elements = currentSlide.elements.filter(el => el.id !== selectedElementId);
+                deselectAll();
+            }
+
+            function selectElement(id) {
+                if (selectedElementId === id) return;
+                selectedElementId = id;
+                renderAll();
+            }
+
+            function deselectAll() {
+                selectedElementId = null;
+                renderAll();
+            }
+
+            function updateElementProperty(prop, value, shouldSave = false) {
+                const el = getSelectedElement();
+                if (el) {
+                    if (['x', 'y', 'w', 'h'].includes(prop)) {
+                         const slideRect = slideContainer.getBoundingClientRect();
+                         const parentDim = ['x', 'w'].includes(prop) ? slideRect.width : slideRect.height;
+                         if (parentDim > 0) el[prop] = (value / parentDim) * 100;
+                    } else {
+                        el[prop] = value;
+                    }
+                    if (shouldSave) saveState();
+                    renderAll();
+                }
+            }
+
+            function addSlide() {
+                saveState();
+                const newSlide = { id: nextSlideId++, elements: [], backgroundColor: '#ffffff' };
+                presentation.slides.push(newSlide);
+                selectSlide(newSlide.id);
+            }
+
+            function deleteSlide(slideId) {
+                if (presentation.slides.length <= 1) {
+                    alert('最後のスライドは削除できません。');
+                    return;
+                }
+                saveState();
+                presentation.slides = presentation.slides.filter(s => s.id !== slideId);
+                if (presentation.currentSlideId === slideId) {
+                    selectSlide(presentation.slides[0]?.id || null);
+                } else {
+                    renderAll();
+                }
+            }
+
+            function selectSlide(slideId) {
+                presentation.currentSlideId = slideId ?? null;
+                deselectAll();
+            }
+            
+            // --- Preview Functions ---
+            function getAnimationSteps(slide) {
+                if (!slide || !slide.elements) return [];
+                const orders = new Set(slide.elements.map(el => el.animationOrder || 0));
+                return [...orders].filter(order => order > 0).sort((a, b) => a - b);
+            }
+
+            function openPreview() {
+                // BUGFIX: Unfocus any active element to save its state before previewing
+                if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                }
+
+                const currentSlideIndex = presentation.slides.findIndex(s => s.id === presentation.currentSlideId);
+                previewSlideIndex = currentSlideIndex !== -1 ? currentSlideIndex : 0;
+                previewStepIndex = 0;
+                previewOverlay.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                document.addEventListener('keydown', handlePreviewKeyPress);
+                renderPreviewSlide();
+            }
+
+            function closePreview() {
+                previewOverlay.classList.add('hidden');
+                document.body.style.overflow = '';
+                document.removeEventListener('keydown', handlePreviewKeyPress);
+            }
+
+            function renderPreviewSlide() {
+                const slide = presentation.slides[previewSlideIndex];
+                if (!slide) return;
+
+                previewSlideHost.innerHTML = '';
+                previewSlideHost.style.backgroundColor = slide.backgroundColor;
+
+                const slideRect = previewSlideHost.getBoundingClientRect();
+                const animationSteps = getAnimationSteps(slide);
+                const currentMaxOrder = previewStepIndex > 0 ? animationSteps[previewStepIndex - 1] : 0;
+
+                slide.elements.sort((a, b) => (a.z || 0) - (b.z || 0)).forEach(el => {
+                    const elDiv = document.createElement('div');
+                    elDiv.className = 'absolute box-border p-2 overflow-hidden';
+                    
+                    elDiv.style.left = `${el.x}%`;
+                    elDiv.style.top = `${el.y}%`;
+                    elDiv.style.width = `${el.w}%`;
+                    elDiv.style.height = `${el.h}%`;
+                    elDiv.style.zIndex = el.z;
+
+                    if (el.type === 'text') {
+                        elDiv.style.color = el.textColor;
+                        elDiv.style.fontFamily = el.fontFamily;
+                        elDiv.style.fontSize = `${(el.fontSize / 100) * slideRect.height}px`;
+                        elDiv.style.overflowWrap = 'break-word';
+                        elDiv.innerHTML = el.content.replace(/\n/g, '<br>');
+                        try {
+                           window.renderMathInElement(elDiv, { delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}], throwOnError: false });
+                        } catch (error) { console.error("KaTeX rendering error:", error); }
+                    } else if (el.type === 'image') {
+                        elDiv.innerHTML = `<img src="${el.content}" class="w-full h-full object-contain">`;
+                    }
+                    
+                    const elOrder = el.animationOrder || 0;
+                    const shouldBeVisible = elOrder === 0 || elOrder <= currentMaxOrder;
+                    const isAnimatingNow = elOrder === currentMaxOrder && elOrder > 0;
+
+                    // --- NEW ANIMATION LOGIC ---
+                    if (!shouldBeVisible) {
+                        elDiv.style.opacity = '0';
+                        elDiv.style.pointerEvents = 'none';
+                        previewSlideHost.appendChild(elDiv);
+                        return; // Skip the rest for elements that shouldn't be visible yet
+                    }
+
+                    // Element should be visible
+                    if (isAnimatingNow && el.animationType === 'fade') {
+                        // It's this element's turn to animate
+                        elDiv.style.opacity = '0'; // Start transparent
+                        elDiv.style.transition = 'opacity 0.5s ease-in-out';
+                        setTimeout(() => {
+                            elDiv.style.opacity = '1'; // Fade in
+                        }, 10); // A tiny delay ensures the transition applies correctly
+                    } else {
+                        // It was already visible from a previous step, or it's 'instant'
+                        elDiv.style.opacity = '1'; // Show instantly
+                        elDiv.style.transition = 'none'; // No animation
+                    }
+                    
+                    previewSlideHost.appendChild(elDiv);
+                });
+                
+                previewPageNumber.textContent = `${previewSlideIndex + 1} / ${presentation.slides.length}`;
+            }
+
+            function advancePreview() {
+                const currentSlide = presentation.slides[previewSlideIndex];
+                const animationSteps = getAnimationSteps(currentSlide);
+
+                if (previewStepIndex < animationSteps.length) {
+                    previewStepIndex++;
+                    renderPreviewSlide();
+                } else {
+                    if (previewSlideIndex < presentation.slides.length - 1) {
+                        previewSlideIndex++;
+                        previewStepIndex = 0;
+                        renderPreviewSlide();
+                    } else {
+                        closePreview();
+                    }
+                }
+            }
+
+            function retreatPreview() {
+                if (previewStepIndex > 0) {
+                    previewStepIndex--;
+                    renderPreviewSlide();
+                } else {
+                    if (previewSlideIndex > 0) {
+                        previewSlideIndex--;
+                        const prevSlide = presentation.slides[previewSlideIndex];
+                        const prevAnimationSteps = getAnimationSteps(prevSlide);
+                        previewStepIndex = prevAnimationSteps.length;
+                        renderPreviewSlide();
+                    } else {
+                        closePreview();
+                    }
+                }
+            }
+            
+            function handlePreviewKeyPress(e) {
+                if (e.key === 'ArrowRight' || e.key === ' ') {
+                    e.preventDefault();
+                    advancePreview();
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    retreatPreview();
+                } else if (e.key === 'Escape') {
+                    closePreview();
+                }
+            }
+
+            // --- Event Handlers ---
+            slideBgColorInput.addEventListener('change', (e) => {
+                const currentSlide = getCurrentSlide();
+                if (currentSlide) {
+                    saveState();
+                    currentSlide.backgroundColor = e.target.value;
+                    renderAll();
+                }
+            });
+
+            addTextboxBtn.addEventListener('click', () => addElement('text'));
+            addImageBtn.addEventListener('click', () => imageInput.click());
+            imageInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => addElement('image', event.target.result);
+                    reader.readAsDataURL(e.target.files[0]);
+                }
+                e.target.value = null;
+            });
+            deleteElementBtn.addEventListener('click', deleteSelectedElement);
+            addSlideBtn.addEventListener('click', addSlide);
+            undoBtn.addEventListener('click', undo);
+            redoBtn.addEventListener('click', redo);
+            
+            previewBtn.addEventListener('click', openPreview);
+            exitPreviewBtn.addEventListener('click', closePreview);
+            previewNavLeft.addEventListener('click', retreatPreview);
+            previewNavRight.addEventListener('click', advancePreview);
+
+            slideContainer.addEventListener('pointerdown', (e) => {
+                if (e.target === slideContainer || e.target === slideBackground) deselectAll();
+            });
+            
+            Object.keys(propInputs).forEach(key => {
+                const input = propInputs[key];
+                const isCheckbox = input.type === 'checkbox';
+                input.addEventListener('input', () => {
+                    if (selectedElementId === null) return;
+                    const value = isCheckbox ? input.checked : (input.type === 'number' ? parseFloat(input.value) || 0 : input.value);
+                    updateElementProperty(key, value, false);
+                });
+                input.addEventListener('change', () => {
+                    if (selectedElementId !== null) saveState();
+                });
+            });
+
+            const onPointerMove = (e) => {
+                if (!activeOperation) return;
+                e.preventDefault();
+                const pointer = e.touches ? e.touches[0] : e;
+                const el = getSelectedElement();
+                if (!el) return;
+                
+                const slideRect = slideContainer.getBoundingClientRect();
+                const dx = pointer.clientX - activeOperation.startClientX;
+                const dy = pointer.clientY - activeOperation.startClientY;
+
+                if (activeOperation.type === 'move') {
+                    el.x = activeOperation.startX + (dx / slideRect.width) * 100;
+                    el.y = activeOperation.startY + (dy / slideRect.height) * 100;
+                } else if (activeOperation.type === 'resize') {
+                    const newW = activeOperation.startW - (dx / slideRect.width) * 100;
+                    const newH = activeOperation.startH - (dy / slideRect.height) * 100;
+                    if (newW > 2 && newH > 2) {
+                       el.w = newW; el.h = newH;
+                       el.x = activeOperation.startX + (dx / slideRect.width) * 100;
+                       el.y = activeOperation.startY + (dy / slideRect.height) * 100;
+                    }
+                }
+                renderSlide(); 
+                updatePropertiesPanel();
+            };
+
+            const onPointerUp = () => {
+                if (activeOperation) {
+                    saveState();
+                }
+                activeOperation = null;
+                document.removeEventListener('pointermove', onPointerMove);
+                document.removeEventListener('pointerup', onPointerUp);
+            };
+            
+            // --- Late dependency loading ---
+            window.onload = () => {
+                // This ensures KaTeX is loaded before we try to use it
+                renderAll();
+            };
+
+            // --- Initial Load ---
+            new ResizeObserver(renderAll).observe(slideContainer);
+            updateUndoRedoButtons();
+            renderAll();
+        });
+    </script>
+</body>
+</html>
