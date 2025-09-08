@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>プレゼンテーションアプリ</title>
-    <meta name="theme-color" content="#ffffff"/>
+    <meta name="theme-color" content="#1e293b"/> <!-- ダークモードの色に変更 -->
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMeaPoAbJFdSfBocSLweQSabRjFxFbDYwPrJQioVdELjH/rML" crossorigin="anonymous">
@@ -12,17 +12,19 @@
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" xintegrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
     <!-- Custom Styles -->
     <style>
+        /* ダークモードに合わせたフォント色 */
         body {
             font-family: 'Inter', 'Helvetica Neue', 'Arial', 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'BIZ UDPGothic', Meiryo, sans-serif;
             touch-action: none; /* Disable browser default touch actions like pinch-zoom */
+            color: #d1d5db; /* default text-gray-300 */
         }
         /* 16:9 aspect ratio for the slide */
         .slide {
             position: relative;
             width: 100%;
             padding-top: 56.25%; /* 9 / 16 = 0.5625 */
-            background-color: white;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            background-color: white; /* スライド自体は白背景のまま */
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5); /* 影を強調 */
             overflow: hidden;
             border-radius: 8px;
             transition: background-color 0.2s;
@@ -44,6 +46,11 @@
             transition: border-color 0.2s;
             overflow-wrap: break-word;
             line-height: 1.2;
+            /* 要素内のテキストが選択されないようにする */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
         }
         .slide-element.selected {
             border: 2px solid #3b82f6; /* blue-500 */
@@ -80,33 +87,56 @@
             border-color: #3b82f6;
             box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
         }
+        /* ダークモードの入力欄スタイル */
+        input[type="number"], input[type="file"], select, textarea {
+            background-color: #334155; /* slate-700 */
+            border: 1px solid #475569; /* slate-600 */
+            color: #e2e8f0; /* slate-200 */
+        }
+        input[type="color"] {
+             border: 1px solid #475569; /* slate-600 */
+        }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 h-screen overflow-hidden flex flex-col">
+<body class="bg-slate-900 text-gray-300 h-screen overflow-hidden flex flex-col">
 
     <!-- Header / Toolbar -->
-    <header class="bg-white shadow-md p-2 flex items-center space-x-4 z-20 flex-shrink-0">
-        <h1 class="text-lg font-bold text-gray-700">プレゼンテーション</h1>
-        <button id="add-textbox" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
+    <header class="bg-slate-800 shadow-lg p-2 flex items-center space-x-4 z-20 flex-shrink-0">
+        <h1 class="text-lg font-bold text-gray-200">プレゼンテーション</h1>
+        
+        <!-- File Menu -->
+        <div class="relative" id="file-menu-container">
+            <button id="file-menu-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
+                ファイル
+            </button>
+            <div id="file-menu-dropdown" class="hidden absolute top-full left-0 mt-2 w-48 bg-slate-700 rounded-md shadow-lg py-1 z-30">
+                <a href="#" id="new-btn" class="block px-4 py-2 text-sm text-gray-200 hover:bg-slate-600">新規作成</a>
+                <a href="#" id="save-btn" class="block px-4 py-2 text-sm text-gray-200 hover:bg-slate-600">名前を付けて保存</a>
+                <a href="#" id="load-btn" class="block px-4 py-2 text-sm text-gray-200 hover:bg-slate-600">開く</a>
+                <input type="file" id="load-input" accept=".json" class="hidden">
+            </div>
+        </div>
+
+        <button id="add-textbox" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
             テキスト追加
         </button>
-        <button id="add-image" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
+        <button id="add-image" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
             画像追加
         </button>
         <input type="file" id="image-input" accept="image/*" class="hidden">
         <div class="flex items-center space-x-2">
-            <label for="slide-bg-color" class="text-sm font-medium text-gray-600">スライド背景色:</label>
+            <label for="slide-bg-color" class="text-sm font-medium text-gray-400">スライド背景色:</label>
             <input type="color" id="slide-bg-color" value="#ffffff" class="w-10 h-8 p-1 border rounded-md cursor-pointer">
         </div>
         <!-- New Controls: Undo, Redo, Preview -->
         <div class="flex items-center space-x-2 ml-auto">
-            <button id="undo-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed">
+            <button id="undo-btn" class="bg-slate-600 hover:bg-slate-700 text-gray-200 font-bold py-2 px-4 rounded-lg transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed">
                 元に戻す
             </button>
-            <button id="redo-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-4 rounded-lg transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed">
+            <button id="redo-btn" class="bg-slate-600 hover:bg-slate-700 text-gray-200 font-bold py-2 px-4 rounded-lg transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed">
                 やり直し
             </button>
-            <button id="preview-btn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
+            <button id="preview-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
                 プレビュー
             </button>
         </div>
@@ -115,9 +145,9 @@
     <!-- Main Content -->
     <main class="flex-grow flex p-4 gap-4 overflow-hidden">
         <!-- Thumbnail Panel -->
-        <aside class="w-48 bg-white p-3 rounded-lg shadow-lg flex flex-col flex-shrink-0">
-            <h2 class="text-md font-bold mb-3 text-center text-gray-700">スライド一覧</h2>
-            <div id="thumbnail-list" class="flex-grow space-y-3 overflow-y-auto">
+        <aside class="w-48 bg-slate-800 p-3 rounded-lg shadow-lg flex flex-col flex-shrink-0">
+            <h2 class="text-md font-bold mb-3 text-center text-gray-200">スライド一覧</h2>
+            <div id="thumbnail-list" class="flex-grow space-y-3 overflow-y-auto pr-1">
                 <!-- Thumbnails will be rendered here -->
             </div>
             <button id="add-slide" class="mt-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow w-full">
@@ -137,44 +167,44 @@
         </div>
 
         <!-- Properties Panel -->
-        <aside id="properties-panel" class="w-80 bg-white p-4 rounded-lg shadow-lg overflow-y-auto flex-shrink-0">
+        <aside id="properties-panel" class="w-80 bg-slate-800 p-4 rounded-lg shadow-lg overflow-y-auto flex-shrink-0">
             <div id="panel-placeholder" class="text-center text-gray-500">
                 <p>要素を選択して編集します</p>
             </div>
             <div id="panel-content" class="hidden space-y-4">
                 <div>
-                    <h3 class="font-bold mb-2">トランスフォーム</h3>
+                    <h3 class="font-bold mb-2 text-gray-200">トランスフォーム</h3>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label for="prop-x" class="text-sm font-medium text-gray-600 block">X (px)</label>
-                            <input type="number" id="prop-x" class="w-full p-1 border rounded-md">
+                            <label for="prop-x" class="text-sm font-medium text-gray-400 block">X (px)</label>
+                            <input type="number" id="prop-x" class="w-full p-1 rounded-md">
                         </div>
                         <div>
-                            <label for="prop-y" class="text-sm font-medium text-gray-600 block">Y (px)</label>
+                            <label for="prop-y" class="text-sm font-medium text-gray-400 block">Y (px)</label>
                             <input type="number" id="prop-y" class="w-full p-1 border rounded-md">
                         </div>
                         <div>
-                            <label for="prop-w" class="text-sm font-medium text-gray-600 block">幅 (px)</label>
+                            <label for="prop-w" class="text-sm font-medium text-gray-400 block">幅 (px)</label>
                             <input type="number" id="prop-w" class="w-full p-1 border rounded-md">
                         </div>
                         <div>
-                            <label for="prop-h" class="text-sm font-medium text-gray-600 block">高さ (px)</label>
+                            <label for="prop-h" class="text-sm font-medium text-gray-400 block">高さ (px)</label>
                             <input type="number" id="prop-h" class="w-full p-1 border rounded-md">
                         </div>
                     </div>
                 </div>
                 <div id="text-properties" class="space-y-2">
-                    <h3 class="font-bold">テキストスタイル</h3>
+                    <h3 class="font-bold text-gray-200">テキストスタイル</h3>
                     <div>
-                        <label for="prop-textColor" class="text-sm font-medium text-gray-600 block">文字色</label>
+                        <label for="prop-textColor" class="text-sm font-medium text-gray-400 block">文字色</label>
                         <input type="color" id="prop-textColor" class="w-full h-8 p-0 border rounded-md">
                     </div>
                      <div>
-                        <label for="prop-fontSize" class="text-sm font-medium text-gray-600 block">フォントサイズ (% of slide height)</label>
+                        <label for="prop-fontSize" class="text-sm font-medium text-gray-400 block">フォントサイズ (% of slide height)</label>
                         <input type="number" id="prop-fontSize" min="1" class="w-full p-1 border rounded-md">
                     </div>
                     <div>
-                        <label for="prop-fontFamily" class="text-sm font-medium text-gray-600 block">フォント</label>
+                        <label for="prop-fontFamily" class="text-sm font-medium text-gray-400 block">フォント</label>
                         <select id="prop-fontFamily" class="w-full p-1 border rounded-md">
                             <option value="'Inter', sans-serif">Inter (サンセリフ)</option>
                             <option value="'Times New Roman', serif">Times New Roman (セリフ)</option>
@@ -185,35 +215,35 @@
                         </select>
                     </div>
                      <div>
-                        <label for="prop-content" class="text-sm font-bold text-gray-600 block mb-1">テキスト内容</label>
+                        <label for="prop-content" class="text-sm font-bold text-gray-400 block mb-1">テキスト内容</label>
                         <textarea id="prop-content" rows="6" class="w-full p-2 border rounded-md font-mono text-sm" placeholder="テキストを入力...&#10;LaTeX記法が使えます: $E=mc^2$"></textarea>
                     </div>
                 </div>
                 <!-- Animation Properties -->
-                <div id="animation-properties" class="space-y-2 border-t pt-4">
-                    <h3 class="font-bold">アニメーション</h3>
+                <div id="animation-properties" class="space-y-2 border-t border-slate-700 pt-4">
+                    <h3 class="font-bold text-gray-200">アニメーション</h3>
                     <div>
-                        <label for="prop-animationType" class="text-sm font-medium text-gray-600 block">登場エフェクト</label>
+                        <label for="prop-animationType" class="text-sm font-medium text-gray-400 block">登場エフェクト</label>
                         <select id="prop-animationType" class="w-full p-1 border rounded-md">
                             <option value="instant">瞬時に登場</option>
                             <option value="fade">ぼやけながら登場</option>
                         </select>
                     </div>
                     <div>
-                        <label for="prop-animationOrder" class="text-sm font-medium text-gray-600 block">表示順序</label>
+                        <label for="prop-animationOrder" class="text-sm font-medium text-gray-400 block">表示順序</label>
                         <input type="number" id="prop-animationOrder" min="0" class="w-full p-1 border rounded-md" placeholder="0はページ表示時">
                     </div>
                 </div>
-                 <div class="border-t pt-4">
-                    <label for="prop-z" class="text-sm font-medium text-gray-600 block">レイヤー (重ね順)</label>
+                 <div class="border-t border-slate-700 pt-4">
+                    <label for="prop-z" class="text-sm font-medium text-gray-400 block">レイヤー (重ね順)</label>
                     <input type="number" id="prop-z" min="1" class="w-full p-1 border rounded-md">
                 </div>
                  <div class="flex justify-between items-center pt-4">
                     <div class="flex items-center">
-                        <input type="checkbox" id="prop-lock" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                        <label for="prop-lock" class="ml-2 block text-sm text-gray-900">ロック</label>
+                        <input type="checkbox" id="prop-lock" class="h-4 w-4 rounded border-gray-500 bg-slate-700 text-blue-600 focus:ring-blue-500">
+                        <label for="prop-lock" class="ml-2 block text-sm text-gray-200">ロック</label>
                     </div>
-                    <button id="delete-element" class="bg-red-500 hover:bg-red-600 text-white text-sm font-bold py-1 px-3 rounded-md transition-colors">
+                    <button id="delete-element" class="bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-1 px-3 rounded-md transition-colors">
                         要素を削除
                     </button>
                 </div>
@@ -222,7 +252,7 @@
     </main>
     
     <!-- Preview Overlay -->
-    <div id="preview-overlay" class="hidden fixed inset-0 bg-gray-900 bg-opacity-95 z-50 flex flex-col items-center justify-center p-4 transition-opacity duration-300">
+    <div id="preview-overlay" class="hidden fixed inset-0 bg-black bg-opacity-95 z-50 flex flex-col items-center justify-center p-4 transition-opacity duration-300">
         <div class="w-full h-full max-w-7xl max-h-full flex items-center justify-center relative">
              <div id="preview-slide-host" class="w-full aspect-video bg-white relative shadow-2xl rounded-lg overflow-hidden">
                 <!-- Preview slide content is rendered here -->
@@ -257,6 +287,15 @@
             const previewPageNumber = document.getElementById('preview-page-number');
             const previewNavLeft = document.getElementById('preview-nav-left');
             const previewNavRight = document.getElementById('preview-nav-right');
+
+            // --- NEW: File Menu Elements ---
+            const fileMenuContainer = document.getElementById('file-menu-container');
+            const fileMenuBtn = document.getElementById('file-menu-btn');
+            const fileMenuDropdown = document.getElementById('file-menu-dropdown');
+            const newBtn = document.getElementById('new-btn');
+            const saveBtn = document.getElementById('save-btn');
+            const loadBtn = document.getElementById('load-btn');
+            const loadInput = document.getElementById('load-input');
             
             const propertiesPanel = document.getElementById('properties-panel');
             const panelPlaceholder = document.getElementById('panel-placeholder');
@@ -279,14 +318,7 @@
             };
 
             // --- App State ---
-            let presentation = {
-                slides: [{
-                    id: 0,
-                    elements: [],
-                    backgroundColor: '#ffffff'
-                }],
-                currentSlideId: 0,
-            };
+            let presentation = {}; // Initialize as empty, will be loaded/reset
             let selectedElementId = null;
             let nextElementId = 1;
             let nextSlideId = 1;
@@ -297,9 +329,109 @@
             let previewStepIndex = 0; // Animation step within a slide
 
             // --- Helper Functions ---
+            const getDefaultPresentation = () => ({
+                slides: [{
+                    id: 0,
+                    elements: [],
+                    backgroundColor: '#ffffff'
+                }],
+                currentSlideId: 0,
+            });
+
             const getCurrentSlide = () => presentation.slides.find(s => s.id === presentation.currentSlideId);
             const getSelectedElement = () => getCurrentSlide()?.elements.find(el => el.id === selectedElementId);
             const cloneState = (state) => JSON.parse(JSON.stringify(state));
+            
+            // --- NEW: Data Management Functions ---
+            function saveToLocalStorage() {
+                try {
+                    localStorage.setItem('presentationData', JSON.stringify(presentation));
+                } catch (e) {
+                    console.error("Failed to save to localStorage:", e);
+                }
+            }
+            
+            function loadFromLocalStorage() {
+                try {
+                    const savedData = localStorage.getItem('presentationData');
+                    if (savedData) {
+                        presentation = JSON.parse(savedData);
+                        console.log("Loaded presentation from localStorage.");
+                    } else {
+                        presentation = getDefaultPresentation();
+                        console.log("Initialized new presentation.");
+                    }
+                } catch (e) {
+                    console.error("Failed to load from localStorage, initializing new presentation:", e);
+                    presentation = getDefaultPresentation();
+                }
+                updateNextIds();
+            }
+            
+            function updateNextIds() {
+                let maxSlideId = -1;
+                let maxElementId = -1;
+                presentation.slides.forEach(slide => {
+                    if (slide.id > maxSlideId) maxSlideId = slide.id;
+                    slide.elements.forEach(el => {
+                        if (el.id > maxElementId) maxElementId = el.id;
+                    });
+                });
+                nextSlideId = maxSlideId + 1;
+                nextElementId = maxElementId + 1;
+            }
+
+            function newPresentation() {
+                if (confirm('現在の編集内容は破棄されます。新しいプレゼンテーションを作成しますか？')) {
+                    presentation = getDefaultPresentation();
+                    undoStack = [];
+                    redoStack = [];
+                    updateUndoRedoButtons();
+                    saveToLocalStorage();
+                    renderAll();
+                }
+            }
+
+            function saveToFile() {
+                const dataStr = JSON.stringify(presentation, null, 2);
+                const blob = new Blob([dataStr], {type: "application/json"});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'presentation.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            function loadFromFile(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const loadedPresentation = JSON.parse(e.target.result);
+                        // Basic validation
+                        if (loadedPresentation && Array.isArray(loadedPresentation.slides)) {
+                            presentation = loadedPresentation;
+                            updateNextIds();
+                            saveState(); // Push loaded state to undo stack
+                            saveToLocalStorage();
+                            renderAll();
+                        } else {
+                            throw new Error("Invalid presentation file format.");
+                        }
+                    } catch (err) {
+                        alert("ファイルの読み込みに失敗しました。有効なJSONファイルではありません。");
+                        console.error("File load error:", err);
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = null; // Reset input
+            }
+
 
             // --- History (Undo/Redo) Functions ---
             function saveState() {
@@ -309,6 +441,7 @@
                     undoStack.shift();
                 }
                 updateUndoRedoButtons();
+                saveToLocalStorage(); // Auto-save on every state change
             }
 
             function undo() {
@@ -316,6 +449,8 @@
                 redoStack.push(cloneState(presentation));
                 presentation = undoStack.pop();
                 deselectAll();
+                saveToLocalStorage();
+                renderAll(); // Rerender after state change
                 updateUndoRedoButtons();
             }
 
@@ -324,6 +459,8 @@
                 undoStack.push(cloneState(presentation));
                 presentation = redoStack.pop();
                 deselectAll();
+                saveToLocalStorage();
+                renderAll(); // Rerender after state change
                 updateUndoRedoButtons();
             }
             
@@ -346,7 +483,7 @@
                     thumbWrapper.className = 'relative group';
 
                     const pageNumber = document.createElement('span');
-                    pageNumber.className = 'absolute top-1 left-1 text-xs bg-gray-700 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold z-10';
+                    pageNumber.className = 'absolute top-1 left-1 text-xs bg-slate-700 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold z-10';
                     pageNumber.textContent = index + 1;
                     
                     const thumbDiv = document.createElement('div');
@@ -358,7 +495,7 @@
                     
                     const deleteBtn = document.createElement('button');
                     deleteBtn.innerHTML = '&times;';
-                    deleteBtn.className = 'absolute top-0 right-0 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10';
+                    deleteBtn.className = 'absolute top-0 right-0 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10 -mt-2 -mr-2';
                     deleteBtn.onclick = (e) => {
                         e.stopPropagation();
                         deleteSlide(slide.id);
@@ -372,8 +509,8 @@
             function renderSlide() {
                 const currentSlide = getCurrentSlide();
                 if (!currentSlide) {
-                    slideContainer.innerHTML = '<p class="text-center text-gray-500">スライドがありません。追加してください。</p>';
-                    slideBackground.style.backgroundColor = '#f3f4f6';
+                    slideContainer.innerHTML = `<p class="text-center text-gray-500">スライドがありません。「スライドを追加」ボタンで新しいスライドを作成してください。</p>`;
+                    slideBackground.style.backgroundColor = '#1e293b'; // slate-800
                     return;
                 }
 
@@ -476,9 +613,9 @@
             
             // --- Actions ---
             function addElement(type, content = '') {
-                saveState();
                 const currentSlide = getCurrentSlide();
                 if (!currentSlide) return;
+                saveState();
 
                 const maxZ = Math.max(0, ...currentSlide.elements.map(e => e.z || 0));
                 const newElement = {
@@ -490,7 +627,7 @@
 
                 if (type === 'text') {
                     newElement.content = '新しいテキスト';
-                    newElement.textColor = '#000000';
+                    newElement.textColor = '#000000'; // Default to light text color for dark mode
                     newElement.fontFamily = "'Inter', sans-serif";
                     newElement.fontSize = 5;
                 } else if (type === 'image') {
@@ -503,9 +640,9 @@
             }
 
             function deleteSelectedElement() {
-                saveState();
                 const currentSlide = getCurrentSlide();
                 if (!currentSlide || selectedElementId === null) return;
+                saveState();
                 currentSlide.elements = currentSlide.elements.filter(el => el.id !== selectedElementId);
                 deselectAll();
             }
@@ -570,11 +707,7 @@
             }
 
             function openPreview() {
-                // BUGFIX: Unfocus any active element to save its state before previewing
-                if (document.activeElement instanceof HTMLElement) {
-                    document.activeElement.blur();
-                }
-
+                if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                 const currentSlideIndex = presentation.slides.findIndex(s => s.id === presentation.currentSlideId);
                 previewSlideIndex = currentSlideIndex !== -1 ? currentSlideIndex : 0;
                 previewStepIndex = 0;
@@ -628,26 +761,22 @@
                     const shouldBeVisible = elOrder === 0 || elOrder <= currentMaxOrder;
                     const isAnimatingNow = elOrder === currentMaxOrder && elOrder > 0;
 
-                    // --- NEW ANIMATION LOGIC ---
                     if (!shouldBeVisible) {
                         elDiv.style.opacity = '0';
                         elDiv.style.pointerEvents = 'none';
                         previewSlideHost.appendChild(elDiv);
-                        return; // Skip the rest for elements that shouldn't be visible yet
+                        return; 
                     }
 
-                    // Element should be visible
                     if (isAnimatingNow && el.animationType === 'fade') {
-                        // It's this element's turn to animate
-                        elDiv.style.opacity = '0'; // Start transparent
+                        elDiv.style.opacity = '0';
                         elDiv.style.transition = 'opacity 0.5s ease-in-out';
                         setTimeout(() => {
-                            elDiv.style.opacity = '1'; // Fade in
-                        }, 10); // A tiny delay ensures the transition applies correctly
+                            elDiv.style.opacity = '1';
+                        }, 10);
                     } else {
-                        // It was already visible from a previous step, or it's 'instant'
-                        elDiv.style.opacity = '1'; // Show instantly
-                        elDiv.style.transition = 'none'; // No animation
+                        elDiv.style.opacity = '1';
+                        elDiv.style.transition = 'none';
                     }
                     
                     previewSlideHost.appendChild(elDiv);
@@ -685,8 +814,6 @@
                         const prevAnimationSteps = getAnimationSteps(prevSlide);
                         previewStepIndex = prevAnimationSteps.length;
                         renderPreviewSlide();
-                    } else {
-                        closePreview();
                     }
                 }
             }
@@ -733,6 +860,22 @@
             previewNavLeft.addEventListener('click', retreatPreview);
             previewNavRight.addEventListener('click', advancePreview);
 
+            // --- NEW: File Menu Event Handlers ---
+            fileMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                fileMenuDropdown.classList.toggle('hidden');
+            });
+            document.addEventListener('click', (e) => {
+                if (!fileMenuContainer.contains(e.target)) {
+                    fileMenuDropdown.classList.add('hidden');
+                }
+            });
+            newBtn.addEventListener('click', (e) => { e.preventDefault(); fileMenuDropdown.classList.add('hidden'); newPresentation(); });
+            saveBtn.addEventListener('click', (e) => { e.preventDefault(); fileMenuDropdown.classList.add('hidden'); saveToFile(); });
+            loadBtn.addEventListener('click', (e) => { e.preventDefault(); fileMenuDropdown.classList.add('hidden'); loadInput.click(); });
+            loadInput.addEventListener('change', loadFromFile);
+
+
             slideContainer.addEventListener('pointerdown', (e) => {
                 if (e.target === slideContainer || e.target === slideBackground) deselectAll();
             });
@@ -740,13 +883,18 @@
             Object.keys(propInputs).forEach(key => {
                 const input = propInputs[key];
                 const isCheckbox = input.type === 'checkbox';
-                input.addEventListener('input', () => {
+                input.addEventListener('input', (e) => {
                     if (selectedElementId === null) return;
                     const value = isCheckbox ? input.checked : (input.type === 'number' ? parseFloat(input.value) || 0 : input.value);
                     updateElementProperty(key, value, false);
                 });
-                input.addEventListener('change', () => {
-                    if (selectedElementId !== null) saveState();
+                input.addEventListener('change', (e) => {
+                    if (selectedElementId !== null) {
+                        // For text area, blur triggers change, so we must update property one last time.
+                        const value = isCheckbox ? input.checked : (input.type === 'number' ? parseFloat(input.value) || 0 : input.value);
+                        updateElementProperty(key, value, false);
+                        saveState();
+                    }
                 });
             });
 
@@ -773,8 +921,7 @@
                        el.y = activeOperation.startY + (dy / slideRect.height) * 100;
                     }
                 }
-                renderSlide(); 
-                updatePropertiesPanel();
+                renderAll(); // Rerender on move for real-time feedback
             };
 
             const onPointerUp = () => {
@@ -786,30 +933,13 @@
                 document.removeEventListener('pointerup', onPointerUp);
             };
             
-            // --- Late dependency loading ---
-            window.onload = () => {
-                // This ensures KaTeX is loaded before we try to use it
-                renderAll();
-            };
-
             // --- Initial Load ---
+            loadFromLocalStorage();
             new ResizeObserver(renderAll).observe(slideContainer);
             updateUndoRedoButtons();
             renderAll();
         });
     </script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => {
-                        console.log('Service Worker registered: ', registration);
-                    })
-                    .catch(registrationError => {
-                        console.log('Service Worker registration failed: ', registrationError);
-                    });
-            });
-        }
-    </script>
 </body>
 </html>
+
