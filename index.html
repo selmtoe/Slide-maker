@@ -101,10 +101,10 @@
 <body class="bg-slate-900 text-gray-300 h-screen overflow-hidden flex flex-col">
 
     <!-- Header / Toolbar -->
+
     <header class="bg-slate-800 shadow-lg p-2 flex items-center space-x-4 z-20 flex-shrink-0">
-        <h1 class="text-lg font-bold text-gray-200">プレゼンテーション</h1>
+        <h1 class="text-lg font-bold text-gray-200"></h1>
         
-        <!-- File Menu -->
         <div class="relative" id="file-menu-container">
             <button id="file-menu-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
                 ファイル
@@ -128,7 +128,6 @@
             <label for="slide-bg-color" class="text-sm font-medium text-gray-400">スライド背景色:</label>
             <input type="color" id="slide-bg-color" value="#ffffff" class="w-10 h-8 p-1 border rounded-md cursor-pointer">
         </div>
-        <!-- New Controls: Undo, Redo, Preview -->
         <div class="flex items-center space-x-2 ml-auto">
             <button id="undo-btn" class="bg-slate-600 hover:bg-slate-700 text-gray-200 font-bold py-2 px-4 rounded-lg transition-colors shadow disabled:opacity-50 disabled:cursor-not-allowed">
                 元に戻す
@@ -139,8 +138,12 @@
             <button id="preview-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
                 プレビュー
             </button>
+            <button id="script-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
+                スクリプト実行
+            </button>
         </div>
     </header>
+
 
     <!-- Main Content -->
     <main class="flex-grow flex p-4 gap-4 overflow-hidden">
@@ -261,13 +264,32 @@
              <div id="preview-nav-left" class="absolute left-0 top-0 h-full w-1/2 cursor-pointer z-10"></div>
              <div id="preview-nav-right" class="absolute right-0 top-0 h-full w-1/2 cursor-pointer z-10"></div>
         </div>
+
         <button id="exit-preview-btn" class="absolute top-4 right-4 text-white hover:text-gray-300 text-5xl font-light transition z-20">&times;</button>
         <div id="preview-page-number" class="absolute bottom-4 text-white text-lg font-semibold"></div>
+    </div>
+
+    <div id="script-modal" class="hidden fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl flex flex-col" style="height: 80vh;">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center">
+                <h2 class="text-lg font-bold text-gray-200">スクリプトエディタ</h2>
+                <button id="close-script-modal-btn" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="p-4 flex-grow">
+                <textarea id="script-input" class="w-full h-full p-2 border rounded-md font-mono text-sm bg-slate-900 border-slate-700 text-gray-200" placeholder="presentationオブジェクトや各種関数（getCurrentSlide(), renderAll(), saveState()など）にアクセスできます。"></textarea>
+            </div>
+            <div class="p-4 border-t border-slate-700 flex justify-end">
+                <button id="execute-script-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">
+                    実行
+                </button>
+            </div>
+        </div>
     </div>
 
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+  
             // --- DOM Elements ---
             const slideContainer = document.getElementById('slide-content');
             const slideBackground = document.getElementById('slide-background');
@@ -281,6 +303,7 @@
             const undoBtn = document.getElementById('undo-btn');
             const redoBtn = document.getElementById('redo-btn');
             const previewBtn = document.getElementById('preview-btn');
+
             const previewOverlay = document.getElementById('preview-overlay');
             const exitPreviewBtn = document.getElementById('exit-preview-btn');
             const previewSlideHost = document.getElementById('preview-slide-host');
@@ -288,8 +311,15 @@
             const previewNavLeft = document.getElementById('preview-nav-left');
             const previewNavRight = document.getElementById('preview-nav-right');
 
+            const scriptBtn = document.getElementById('script-btn');
+            const scriptModal = document.getElementById('script-modal');
+            const closeScriptModalBtn = document.getElementById('close-script-modal-btn');
+            const scriptInput = document.getElementById('script-input');
+            const executeScriptBtn = document.getElementById('execute-script-btn');
+
             // --- NEW: File Menu Elements ---
             const fileMenuContainer = document.getElementById('file-menu-container');
+
             const fileMenuBtn = document.getElementById('file-menu-btn');
             const fileMenuDropdown = document.getElementById('file-menu-dropdown');
             const newBtn = document.getElementById('new-btn');
@@ -889,13 +919,36 @@ function addElement(type, content = '') {
                     fileMenuDropdown.classList.add('hidden');
                 }
             });
+
             newBtn.addEventListener('click', (e) => { e.preventDefault(); fileMenuDropdown.classList.add('hidden'); newPresentation(); });
             saveBtn.addEventListener('click', (e) => { e.preventDefault(); fileMenuDropdown.classList.add('hidden'); saveToFile(); });
             loadBtn.addEventListener('click', (e) => { e.preventDefault(); fileMenuDropdown.classList.add('hidden'); loadInput.click(); });
             loadInput.addEventListener('change', loadFromFile);
 
+            scriptBtn.addEventListener('click', () => {
+                scriptModal.classList.remove('hidden');
+                scriptInput.focus();
+            });
+
+            closeScriptModalBtn.addEventListener('click', () => {
+                scriptModal.classList.add('hidden');
+            });
+
+            executeScriptBtn.addEventListener('click', () => {
+                const scriptText = scriptInput.value;
+                try {
+                    eval(scriptText);
+                    renderAll(); 
+                } catch (e) {
+                    alert('スクリプトの実行中にエラーが発生しました:\n' + e);
+                    console.error("Script execution error:", e);
+                }
+                scriptModal.classList.add('hidden');
+            });
+
 
             slideContainer.addEventListener('pointerdown', (e) => {
+
                 if (e.target === slideContainer || e.target === slideBackground) deselectAll();
             });
             
@@ -961,4 +1014,3 @@ function addElement(type, content = '') {
     </script>
 </body>
 </html>
-
