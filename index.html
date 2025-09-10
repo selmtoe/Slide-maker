@@ -102,13 +102,19 @@
 
     <!-- Header / Toolbar -->
 
-    <header class="bg-slate-800 shadow-lg p-2 flex items-center space-x-4 z-20 flex-shrink-0">
+<header class="bg-slate-800 shadow-lg p-2 flex items-center space-x-4 z-20 flex-shrink-0">
+        <button id="toggle-thumbnails-btn" class="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-lg transition-colors shadow">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h8m-8 6h16"></path>
+            </svg>
+        </button>
         <h1 class="text-lg font-bold text-gray-200"></h1>
         
         <div class="relative" id="file-menu-container">
             <button id="file-menu-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow">
                 ファイル
             </button>
+
             <div id="file-menu-dropdown" class="hidden absolute top-full left-0 mt-2 w-48 bg-slate-700 rounded-md shadow-lg py-1 z-30">
                 <a href="#" id="new-btn" class="block px-4 py-2 text-sm text-gray-200 hover:bg-slate-600">新規作成</a>
                 <a href="#" id="save-btn" class="block px-4 py-2 text-sm text-gray-200 hover:bg-slate-600">名前を付けて保存</a>
@@ -146,13 +152,12 @@
 
 
     <!-- Main Content -->
-    <main class="flex-grow flex p-4 gap-4 overflow-hidden">
-        <!-- Thumbnail Panel -->
-        <aside class="w-48 bg-slate-800 p-3 rounded-lg shadow-lg flex flex-col flex-shrink-0">
+
+<main class="flex-grow flex p-4 gap-4 overflow-hidden">
+        <aside id="thumbnail-panel" class="w-48 bg-slate-800 p-3 rounded-lg shadow-lg flex flex-col flex-shrink-0">
             <h2 class="text-md font-bold mb-3 text-center text-gray-200">スライド一覧</h2>
             <div id="thumbnail-list" class="flex-grow space-y-3 overflow-y-auto pr-1">
-                <!-- Thumbnails will be rendered here -->
-            </div>
+                </div>
             <button id="add-slide" class="mt-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow w-full">
                 スライドを追加
             </button>
@@ -288,14 +293,18 @@
 
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+
+document.addEventListener('DOMContentLoaded', () => {
   
             // --- DOM Elements ---
+            const toggleThumbnailsBtn = document.getElementById('toggle-thumbnails-btn');
+            const thumbnailPanel = document.getElementById('thumbnail-panel');
             const slideContainer = document.getElementById('slide-content');
             const slideBackground = document.getElementById('slide-background');
             const slideBgColorInput = document.getElementById('slide-bg-color');
             const thumbnailList = document.getElementById('thumbnail-list');
             const addSlideBtn = document.getElementById('add-slide');
+
             const addTextboxBtn = document.getElementById('add-textbox');
             const addImageBtn = document.getElementById('add-image');
             const imageInput = document.getElementById('image-input');
@@ -879,7 +888,11 @@ function addElement(type, content = '') {
                 }
             }
 
-            // --- Event Handlers ---
+// --- Event Handlers ---
+            toggleThumbnailsBtn.addEventListener('click', () => {
+                thumbnailPanel.classList.toggle('hidden');
+            });
+
             slideBgColorInput.addEventListener('change', (e) => {
                 const currentSlide = getCurrentSlide();
                 if (currentSlide) {
