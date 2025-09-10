@@ -527,11 +527,48 @@ document.addEventListener('DOMContentLoaded', () => {
                     pageNumber.textContent = index + 1;
                     
                     const thumbDiv = document.createElement('div');
-                    thumbDiv.className = `thumbnail aspect-video bg-white rounded-md shadow-md ${slide.id === presentation.currentSlideId ? 'active' : ''}`;
+                    thumbDiv.className = `thumbnail aspect-video bg-white rounded-md shadow-md overflow-hidden relative ${slide.id === presentation.currentSlideId ? 'active' : ''}`;
                     thumbDiv.style.backgroundColor = slide.backgroundColor;
                     thumbDiv.dataset.slideId = slide.id;
+
+                    // Render slide elements inside the thumbnail
+                    slide.elements.forEach(el => {
+                        const thumbEl = document.createElement('div');
+                        thumbEl.style.position = 'absolute';
+                        thumbEl.style.left = `${el.x}%`;
+                        thumbEl.style.top = `${el.y}%`;
+                        thumbEl.style.width = `${el.w}%`;
+                        thumbEl.style.height = `${el.h}%`;
+                        thumbEl.style.zIndex = el.z;
+                        thumbEl.style.overflow = 'hidden';
+                        
+                        if (el.type === 'text') {
+                            thumbEl.innerHTML = el.content.replace(/\n/g, '<br>');
+                            thumbEl.style.color = el.textColor;
+                            thumbEl.style.fontFamily = el.fontFamily;
+                            thumbEl.style.fontSize = '0.5vw';
+                            thumbEl.style.lineHeight = '1.1';
+                            thumbEl.style.wordBreak = 'break-word';
+
+                            try {
+                               window.renderMathInElement(thumbEl, {
+                                   delimiters: [{left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}],
+                                   throwOnError: false
+                               });
+                            } catch (error) { console.error("KaTeX rendering error in thumbnail:", error); }
+                        } else if (el.type === 'image') {
+                            const img = document.createElement('img');
+                            img.src = el.content;
+                            img.style.width = '100%';
+                            img.style.height = '100%';
+                            img.style.objectFit = 'contain';
+                            thumbEl.appendChild(img);
+                        }
+                        thumbDiv.appendChild(thumbEl);
+                    });
                     
-                    thumbDiv.addEventListener('click', () => selectSlide(slide.id));
+
+thumbDiv.addEventListener('click', () => selectSlide(slide.id));
                     
                     const deleteBtn = document.createElement('button');
                     deleteBtn.innerHTML = '&times;';
@@ -541,7 +578,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         deleteSlide(slide.id);
                     };
 
-                    thumbWrapper.append(pageNumber, thumbDiv, deleteBtn);
+                    const moveControls = document.createElement('div');
+
+moveControls.className = 'absolute left-1 top-1/2 transform -translate-y-1/2 flex flex-col space-y-1 opacity-0 group-hover:opacity-100 transition-opacity z-10';
+
+                    const upBtn = document.createElement('button');
+                    upBtn.innerHTML = '&#9650;';
+                    upBtn.className = 'bg-slate-600 hover:bg-slate-500 text-white w-6 h-6 rounded-md flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed';
+                    if (index === 0) upBtn.disabled = true;
+                    upBtn.onclick = (e) => { e.stopPropagation(); moveSlide(slide.id, 'up'); };
+
+                    const downBtn = document.createElement('button');
+                    downBtn.innerHTML = '&#9660;';
+                    downBtn.className = 'bg-slate-600 hover:bg-slate-500 text-white w-6 h-6 rounded-md flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed';
+                    if (index === presentation.slides.length - 1) downBtn.disabled = true;
+                    downBtn.onclick = (e) => { e.stopPropagation(); moveSlide(slide.id, 'down'); };
+                    
+                    moveControls.append(upBtn, downBtn);
+
+                    thumbWrapper.append(pageNumber, thumbDiv, deleteBtn, moveControls);
                     thumbnailList.appendChild(thumbWrapper);
                 });
             }
@@ -549,6 +604,7 @@ document.addEventListener('DOMContentLoaded', () => {
             function renderSlide() {
                 const currentSlide = getCurrentSlide();
                 if (!currentSlide) {
+
                     slideContainer.innerHTML = `<p class="text-center text-gray-500">スライドがありません。「スライドを追加」ボタンで新しいスライドを作成してください。</p>`;
                     slideBackground.style.backgroundColor = '#1e293b'; // slate-800
                     return;
@@ -713,7 +769,7 @@ function addElement(type, content = '') {
                 renderAll();
             }
 
-            function updateElementProperty(prop, value, shouldSave = false) {
+function updateElementProperty(prop, value, shouldSave = false) {
                 const el = getSelectedElement();
                 if (el) {
                     if (['x', 'y', 'w', 'h'].includes(prop)) {
@@ -733,22 +789,67 @@ function addElement(type, content = '') {
                 const currentSlide = getCurrentSlide();
                 const newBackgroundColor = currentSlide ? currentSlide.backgroundColor : '#ffffff';
                 const newSlide = { id: nextSlideId++, elements: [], backgroundColor: newBackgroundColor };
-                presentation.slides.push(newSlide);
+                
+                const currentIndex = presentation.slides.findIndex(s => s.id === presentation.currentSlideId);
+                if (currentIndex !== -1) {
+                    presentation.slides.splice(currentIndex + 1, 0, newSlide);
+                } else {
+                    presentation.slides.push(newSlide);
+                }
+                
                 selectSlide(newSlide.id);
             }
 
-            function deleteSlide(slideId) {
+function deleteSlide(slideId) {
                 if (presentation.slides.length <= 1) {
                     alert('最後のスライドは削除できません。');
                     return;
                 }
 
                 saveState();
+
+                // 削除する前に、そのスライドのインデックスを記録しておきます
+                const deletedIndex = presentation.slides.findIndex(s => s.id === slideId);
+
+                // スライド配列から該当スライドを削除します
                 presentation.slides = presentation.slides.filter(s => s.id !== slideId);
-                if (presentation.currentSlideId === slideId) {
-                    selectSlide(presentation.slides[0]?.id || null);
-                } else {
-                    renderAll();
+
+                // 次に選択するスライドを決定します
+                let nextSlideIdToSelect = null;
+                if (presentation.slides.length > 0) {
+                    // 削除されたインデックスが新しい配列の長さを超えていないか確認し、
+                    // 新しい選択インデックスを決定します。
+                    // これにより、最後のスライドを削除した場合は新しい最後のスライドが選ばれます。
+                    const newIndex = Math.min(deletedIndex, presentation.slides.length - 1);
+                    nextSlideIdToSelect = presentation.slides[newIndex].id;
+                }
+                
+                // 新しく決定したスライドを選択します。selectSlideが再描画も行います。
+                selectSlide(nextSlideIdToSelect);
+            }
+
+function moveSlide(slideId, direction) {
+                const index = presentation.slides.findIndex(s => s.id === slideId);
+                if (index === -1) return;
+                
+                let wasMoved = false;
+
+                if (direction === 'up' && index > 0) {
+                    saveState();
+                    // 配列内の要素を入れ替え
+                    [presentation.slides[index - 1], presentation.slides[index]] = [presentation.slides[index], presentation.slides[index - 1]];
+                    wasMoved = true;
+                } else if (direction === 'down' && index < presentation.slides.length - 1) {
+                    saveState();
+                    // 配列内の要素を入れ替え
+                    [presentation.slides[index + 1], presentation.slides[index]] = [presentation.slides[index], presentation.slides[index + 1]];
+                    wasMoved = true;
+                }
+                
+                if (wasMoved) {
+                    // 移動が成功した場合、移動したスライドを選択状態にします。
+                    // selectSlideがUIの再描画（サムネイルとメインスライド）を行います。
+                    selectSlide(slideId);
                 }
             }
 
@@ -759,6 +860,7 @@ function addElement(type, content = '') {
             
             // --- Preview Functions ---
             function getAnimationSteps(slide) {
+
                 if (!slide || !slide.elements) return [];
                 const orders = new Set(slide.elements.map(el => el.animationOrder || 0));
                 return [...orders].filter(order => order > 0).sort((a, b) => a - b);
